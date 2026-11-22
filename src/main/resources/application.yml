@@ -1,0 +1,50 @@
+spring:
+  datasource:
+    url: jdbc:h2:tcp://localhost/~/jpashop
+    username: sa
+    password: ''
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        format_sql: true
+
+  application:
+    name: jpashop
+  output:
+    ansi:
+      enabled: always
+  devtools:
+    # LiveReload is deprecated since Spring Boot 4.1, but enabled for local use here.
+    livereload:
+      enabled: true
+    restart:
+      enabled: true
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-store: true
+        period: 0
+      chain:
+        cache: false
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    check-template-location: true
+
+server:
+  port: 8080
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+    org.springframework.orm.jpa: trace #JPA 트랜잭션 관련 로그
+  pattern:
+    console: '%clr(%d{yyyy-MM-dd | HH:mm:ss.SSS}){faint} %clr([%-5level]) %clr(%-52(%class{0}.%method)){cyan} | %msg%n'
+    file: '%d{yyyy-MM-dd | HH:mm:ss.SSS} [%-5level] %-52(%class{0}.%method) | %msg%n'
