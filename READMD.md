@@ -61,38 +61,39 @@ curl -i -X POST http://localhost:8080/member/signup \
 
 | 계층 | 현재 파일 | 이 요청에서 하는 일 |
 | --- | --- | --- |
-| 표현 계층 (Presentation) | [MemberController](src/main/java/jpabook/jpashop/member/presentation/MemberController.java), [요청 DTO](src/main/java/jpabook/jpashop/member/presentation/dto/MemberCreateRequest.java), [응답 DTO](src/main/java/jpabook/jpashop/member/presentation/dto/MemberCreateResponse.java) | HTTP 요청을 받고 JSON을 DTO로 변환하며 결과를 JSON으로 반환 |
-| 응용 계층 (Application) | [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java) | 회원 생성·저장·응답 조립의 순서를 진행 |
+| 표현 계층 (Presentation) | [MemberController](src/main/java/jpabook/jpashop/member/presentation/MemberController.java), [요청 DTO](src/main/java/jpabook/jpashop/member/presentation/dto/MemberCreateRequest.java), [응답 DTO](src/main/java/jpabook/jpashop/member/presentation/dto/MemberCreateResponse.java) | HTTP 요청 DTO를 회원 객체로 변환하고, 서비스가 반환한 회원을 응답 DTO로 변환 |
+| 응용 계층 (Application) | [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java) | 회원을 저장하고 저장된 ID로 다시 조회해 반환 |
 | 도메인 계층 (Domain) | [Member](src/main/java/jpabook/jpashop/member/domain/Member.java), [Address](src/main/java/jpabook/jpashop/member/domain/vo/Address.java), [MemberRepository](src/main/java/jpabook/jpashop/member/domain/MemberRepository.java) | 회원과 주소를 표현하고 저장소가 제공해야 할 기능을 선언 |
 | 인프라 계층 (Infrastructure) | [MemberRepositoryImpl](src/main/java/jpabook/jpashop/member/infra/MemberRepositoryImpl.java), [MemberJpaRepository](src/main/java/jpabook/jpashop/member/infra/MemberJpaRepository.java) | 도메인 저장소 인터페이스를 구현하고 Spring Data JPA로 DB에 저장 |
 
 ```mermaid
 flowchart LR
     Client[HTTP 클라이언트] --> Controller[표현: MemberController]
-    Controller --> Service[응용: MemberService]
-    Service --> Domain[도메인: Member · Address]
+    Controller --> Domain[도메인: Member · Address]
+    Domain --> Service[응용: MemberService]
     Service --> Port[도메인: MemberRepository 인터페이스]
     Port -. 구현 .-> Adapter[인프라: MemberRepositoryImpl]
     Adapter --> Jpa[인프라: MemberJpaRepository]
     Jpa --> DB[(H2 DB)]
-    Service --> Response[표현 DTO: MemberCreateResponse]
+    Service --> Controller
+    Controller --> Response[표현 DTO: MemberCreateResponse]
     Response --> Client
 ```
 
 ## 3. 실제 내부 처리 순서
 
 1. [MemberController.signup()](src/main/java/jpabook/jpashop/member/presentation/MemberController.java)은 `/member`와 `/signup` 경로를 합쳐 `POST /member/signup`을 처리한다. `@RequestBody`가 JSON을 `MemberCreateRequest`로 받는다.
-2. 컨트롤러는 요청 DTO를 [MemberService.signup()](src/main/java/jpabook/jpashop/member/application/MemberService.java)에 전달한다.
-3. 서비스는 `Address.of(city, street, zipcode)`와 `Member.create(username, address)`로 도메인 객체를 만든다.
+2. 컨트롤러는 요청 DTO의 `to()`를 호출한다. 이 메서드가 `Address.of(city, street, zipcode)`와 `Member.create(username, address)`로 도메인 객체를 만든다.
+3. 컨트롤러는 생성한 `Member`를 [MemberService.signup()](src/main/java/jpabook/jpashop/member/application/MemberService.java)에 전달한다.
 4. 서비스는 도메인 인터페이스 `MemberRepository.save(member)`를 호출한다. 실제 빈인 `MemberRepositoryImpl`이 `MemberJpaRepository.save(member)`에 위임한다.
-5. Spring Data JPA가 회원을 저장한다. `Member.id`는 `GenerationType.IDENTITY`로 생성되며, 서비스는 저장 후 `MemberCreateResponse.from(member)`로 응답 DTO를 만든다. 이 과정에서 `MemberRepository.save()`가 반환한 `Long`은 사용하지 않는다.
-6. `@RestController`가 응답 DTO를 JSON으로 반환한다.
+5. Spring Data JPA가 회원을 저장한다. `Member.id`는 `GenerationType.IDENTITY`로 생성된다. 서비스는 `save()`가 반환한 ID로 `findById()`를 호출해 회원을 다시 조회하고, 조회 결과가 없으면 `IllegalStateException`을 던진다.
+6. 컨트롤러는 반환된 회원을 `MemberCreateResponse.from(saved)`로 응답 DTO에 담고, `@RestController`가 이를 JSON으로 반환한다.
 
-현재 [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java)에는 `@Transactional`이 없다. 이 API의 저장은 Spring Data JPA의 `save()`가 제공하는 트랜잭션 안에서 실행된다. 서비스에서 여러 저장소 작업을 하나의 작업으로 묶어야 한다면 그때 응용 계층 메서드에 트랜잭션 경계를 두는 것이 적절하다.
+현재 [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java)에는 `@Transactional`이 없다. 이 API의 저장과 재조회는 각각 Spring Data JPA의 `save()`와 `findById()`가 제공하는 트랜잭션에서 실행된다. 두 작업을 하나의 트랜잭션으로 묶어야 한다면 응용 계층 메서드에 트랜잭션 경계를 둘 수 있다.
 
 ## 4. 과제에서 구분할 구현 범위
 
-- 네 계층의 **역할은 구분되어 있지만**, 응용 계층의 `MemberService`가 표현 계층의 `MemberCreateRequest`와 `MemberCreateResponse`를 직접 사용한다. 따라서 의존 방향까지 엄격하게 분리한 DDD 구현이라고 설명하면 부정확하다.
-- 요청 DTO의 `to()` 메서드는 존재하지만 현재 회원 가입 흐름에서는 호출되지 않는다. 서비스가 `Member.create(...)`를 직접 호출한다.
+- 응용 계층의 `MemberService`는 표현 계층 DTO를 import하지 않는다. 컨트롤러가 요청 DTO를 도메인 객체로 변환하고 서비스 결과를 응답 DTO로 변환한다.
+- 요청 DTO의 `to()` 메서드는 현재 회원 가입 흐름에서 호출된다. 서비스는 저장 후 `findById()`를 한 번 더 호출한다. JPA 영속성 컨텍스트에 회원이 남아 있다면 이 호출이 별도의 `SELECT` SQL을 실행하지 않을 수도 있다.
 - 회원 이름 중복 확인, 명시적인 입력 검증, 가입 실패 시 통일된 오류 응답은 현재 구현에 없다. 이 문서는 해당 기능이 있다고 가정하지 않는다.
 - 기본 [DB 설정](src/main/resources/application.yml)은 로컬 H2 TCP 연결과 `ddl-auto: create`를 사용한다. 앱을 시작하면 연결된 DB 스키마에 영향을 줄 수 있으므로 과제 실행 환경의 DB 설정을 먼저 확인해야 한다.

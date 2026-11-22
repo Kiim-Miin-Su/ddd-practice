@@ -1,6 +1,7 @@
 package jpabook.jpashop.member.presentation;
 
 import jpabook.jpashop.member.application.MemberService;
+import jpabook.jpashop.member.domain.Member;
 import jpabook.jpashop.member.presentation.dto.MemberCreateRequest;
 import jpabook.jpashop.member.presentation.dto.MemberCreateResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +18,9 @@ public class MemberController {
 	private final MemberService memberService;
 
 	@PostMapping("/signup")
-	public MemberCreateResponse signup(@RequestBody MemberCreateRequest dto) {
-		return this.memberService.signup(dto);
+	public MemberCreateResponse signup(@RequestBody MemberCreateRequest request) {
+		Member saved = this.memberService.signup(request.to());
+		return MemberCreateResponse.from(saved);
 	}
 
 }
