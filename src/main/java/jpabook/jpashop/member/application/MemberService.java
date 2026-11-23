@@ -5,6 +5,7 @@ import jpabook.jpashop.member.application.dto.SignupCommand;
 import jpabook.jpashop.member.domain.MemberRepository;
 import jpabook.jpashop.member.domain.exception.DuplicatedEmail;
 import jpabook.jpashop.member.domain.exception.DuplicatedUsername;
+import jpabook.jpashop.member.domain.exception.MemberErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,9 +21,9 @@ public class MemberService {
 	@Transactional
 	public MemberView signup(SignupCommand command) {
 		if (this.memberRepository.existsByUsername(command.username()))
-			throw new DuplicatedUsername("%s is already in use.".formatted(command.username()));
+			throw new DuplicatedUsername("%s: %s".formatted(MemberErrorCode.DUPLICATED_USERNAME.getMessage(), command.username()));
 		if (this.memberRepository.existsByEmail(command.email()))
-			throw new DuplicatedEmail("%s is already in use.".formatted(command.email()));
+			throw new DuplicatedEmail("%s: %s".formatted(MemberErrorCode.DUPLICATED_EMAIL.getMessage(), command.email()));
 
 		String passwordHash = this.passwordEncoder.encode(command.password());
 

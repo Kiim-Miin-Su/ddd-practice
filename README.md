@@ -43,18 +43,18 @@
 }
 ```
 
-회원 이름이나 이메일이 이미 존재하면 [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java)가 회원별 예외를 던진다. [GlobalExceptionHandler](src/main/java/jpabook/jpashop/common/exception/GlobalExceptionHandler.java)는 해당 예외의 오류 코드를 사용해 `409 Conflict`와 `ApiResponse.fail(...)`을 반환한다. 예를 들어 회원 이름이 중복되면 다음 형태다.
+회원 이름이나 이메일이 이미 존재하면 [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java)가 회원별 예외를 던진다. [MemberExceptionHandler](src/main/java/jpabook/jpashop/member/domain/exception/MemberExceptionHandler.java)는 해당 예외의 오류 코드와 메시지를 사용해 `409 Conflict`와 `ApiResponse.fail(...)`을 반환한다. 예를 들어 `memberA`라는 회원 이름이 중복되면 다음 형태다.
 
 ```json
 {
   "success": false,
-  "message": "중복된 아이디의 회원이 존재합니다."
+  "message": "중복된 아이디의 회원이 존재합니다.: memberA"
 }
 ```
 
-`IllegalArgumentException`은 `400 Bad Request`로 처리한다. 그 밖의 예외는 현재 공통 핸들러가 `500 Internal Server Error`로 처리하며, 요청 DTO 검증 실패를 따로 처리하는 핸들러는 없다.
+`IllegalArgumentException`은 `400 Bad Request`로 처리한다. 그 밖의 예외를 처리하는 공통 핸들러와 요청 DTO 검증 실패를 따로 처리하는 핸들러는 현재 없다.
 
-다음은 요청 형식의 예시다. 현재 버전의 HTTP 응답을 실제 `curl`로 검증한 기록은 없다.
+다음은 요청 형식의 예시다.
 
 ```bash
 curl -i -X POST http://localhost:8080/member/signup \
