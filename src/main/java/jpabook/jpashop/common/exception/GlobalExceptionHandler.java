@@ -1,6 +1,8 @@
 package jpabook.jpashop.common.exception;
 
 import jpabook.jpashop.common.response.ApiResponse;
+import jpabook.jpashop.member.domain.exception.MemberErrorCode;
+import jpabook.jpashop.member.domain.exception.MemberException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -11,7 +13,7 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(MemberException.class) // MEMBER_NOT_FOUND
 	public ResponseEntity<ApiResponse<Void>> handleMemberException(MemberException memberException) {
-		ErrorCode errorCode = memberException.getErrorCode();
+		MemberErrorCode errorCode = memberException.getErrorCode();
 		return this.build(errorCode.getHttpStatus(), errorCode.getMessage());
 	}
 
