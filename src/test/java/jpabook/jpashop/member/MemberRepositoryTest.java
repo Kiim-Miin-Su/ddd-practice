@@ -50,6 +50,7 @@ public class MemberRepositoryTest {
 	}
 
 	@Test
+	@Transactional
 	public void duplicatedUsernameMember() throws DuplicatedUsername {
 		// given
 		SignupRequest request1 = new SignupRequest("minsu", "12345", "kms545487@gmail.com", "Seoul", "Wangsibni", "54321");
@@ -66,6 +67,7 @@ public class MemberRepositoryTest {
 	}
 
 	@Test
+	@Transactional
 	public void duplicatedEmailMember() throws Exception {
 		// given
 		SignupRequest request1 = new SignupRequest("minsu", "12345", "test@gmail.com", "Seoul", "Wangsibni", "54321");
