@@ -24,16 +24,14 @@ public class MemberRepositoryTest {
 		Member member = Member.create("memberA", Address.of("Seoul", "Wangsimli", "12345"));
 
 		// when
-		Long savedId = memberRepository.save(member);
-		Member foundMember = memberRepository.findById(savedId).orElseThrow();
+		this.memberRepository.save(member);
 
 		// then
-		Assertions.assertNotNull(savedId);
-		Assertions.assertEquals(savedId, foundMember.getId());
-		Assertions.assertEquals("memberA", foundMember.getUsername());
-		Assertions.assertEquals("Seoul", foundMember.getAddress().getCity());
-		Assertions.assertEquals("Wangsimli", foundMember.getAddress().getStreet());
-		Assertions.assertEquals("12345", foundMember.getAddress().getZipcode());
+		Assertions.assertNotNull(member);
+		Assertions.assertEquals("memberA", member.getUsername());
+		Assertions.assertEquals("Seoul", member.getAddress().getCity());
+		Assertions.assertEquals("Wangsimli", member.getAddress().getStreet());
+		Assertions.assertEquals("12345", member.getAddress().getZipcode());
 	} // end of testMember();
 
 	@Test

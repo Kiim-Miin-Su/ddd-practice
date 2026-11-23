@@ -18,8 +18,8 @@ public class MemberRepositoryImpl implements MemberRepository { // MemberReposit
 	private final MemberJpaRepository memberJpaRepository; // MemberJpaRepository로 구현: 나중에 갈아낄 수 있음.
 
 	@Override
-	public Long save(Member member) {
-		return this.memberJpaRepository.save(member).getId();
+	public Member save(Member member) {
+		return this.memberJpaRepository.save(member);
 	}
 
 	@Override
