@@ -1,6 +1,6 @@
 # 회원 가입 API를 DDD 4계층으로 읽기
 
-이 문서는 현재 코드의 `POST http://localhost:8080/member/signup`을 과제 설명용으로 정리한 것이다. 아래의 계층 구분은 **현재 구현을 DDD의 표현·응용·도메인·인프라 4계층에 대응**한 것이다.
+이 문서는 현재 코드의 `POST /member/signup`을 표현·응용·도메인·인프라 계층에 대응해 설명한다.
 
 ## 1. 요청과 응답
 
@@ -8,92 +8,96 @@
 | --- | --- |
 | HTTP 메서드와 경로 | `POST /member/signup` |
 | 요청 형식 | `Content-Type: application/json`, JSON 본문 |
-| 성공 응답 | `200 OK`, JSON 본문 |
+| 성공 응답 | `201 Created`, JSON 본문 |
 | 서버 포트 | `8080` ([설정](src/main/resources/application.yml)) |
 
-요청 본문은 주소를 별도 객체로 감싸지 않는 **평평한 구조**다. 필드 이름은 [MemberCreateRequest](src/main/java/jpabook/jpashop/member/presentation/dto/MemberCreateRequest.java)의 record 구성 요소와 일치해야 한다.
+요청 본문은 [SignupRequest](src/main/java/jpabook/jpashop/member/presentation/dto/SignupRequest.java)의 필드처럼 주소를 별도 객체로 감싸지 않는다.
 
 ```json
 {
   "username": "memberA",
+  "password": "example-password",
+  "email": "memberA@example.com",
   "city": "Seoul",
   "street": "Wangsimli",
   "zipcode": "12345"
 }
 ```
 
-| 요청 필드 | Java 타입 | 용도 |
-| --- | --- | --- |
-| `username` | `String` | 회원 이름. `Member.username`은 DB에서 `null`을 허용하지 않음 |
-| `city` | `String` | 주소의 도시 |
-| `street` | `String` | 주소의 거리 |
-| `zipcode` | `String` | 주소의 우편번호 |
+`username`, `password`, `email`에는 `@NotBlank`가, `email`에는 `@Email`이 선언되어 있다. [MemberController.signup()](src/main/java/jpabook/jpashop/member/presentation/MemberController.java)은 `@Valid`로 요청 DTO의 검증을 실행한다. 주소 필드에는 별도 검증 어노테이션이 없다. 비밀번호는 [PasswordConfig](src/main/java/jpabook/jpashop/config/PasswordConfig.java)의 `BCryptPasswordEncoder`로 인코딩한 뒤 회원 엔티티에 저장한다.
 
-현재 컨트롤러에는 `@Valid`가 없고, 요청 DTO에도 필드별 검증 어노테이션이 없다. 따라서 이 표는 입력 형식을 설명하며, 모든 값에 대한 사전 검증이 구현됐다는 뜻은 아니다. `username`의 `null` 제약은 [Member 엔티티](src/main/java/jpabook/jpashop/member/domain/Member.java)에 선언되어 있다.
-
-성공하면 [MemberCreateResponse](src/main/java/jpabook/jpashop/member/presentation/dto/MemberCreateResponse.java)와 [AddressResponse](src/main/java/jpabook/jpashop/member/presentation/dto/AddressResponse.java)가 다음 모양으로 직렬화된다. `id`는 DB가 생성하므로 아래 숫자는 예시다.
+성공하면 컨트롤러가 [SignupResponse](src/main/java/jpabook/jpashop/member/presentation/dto/SignupResponse.java)를 [ApiResponse](src/main/java/jpabook/jpashop/common/response/ApiResponse.java)의 `data`에 담아 반환한다. 응답에는 비밀번호와 회원 ID가 포함되지 않는다. `ApiResponse`의 값이 `null`인 필드는 JSON에서 제외된다.
 
 ```json
 {
-  "id": 1,
-  "username": "memberA",
-  "addressResponse": {
-    "city": "Seoul",
-    "street": "Wangsimli",
-    "zipcode": "12345"
+  "success": true,
+  "data": {
+    "username": "memberA",
+    "email": "memberA@example.com",
+    "memberAddressResponse": {
+      "city": "Seoul",
+      "street": "Wangsimli",
+      "zipcode": "12345"
+    }
   }
 }
 ```
 
-컨트롤러에 `@ResponseStatus(CREATED)`나 별도 응답 상태 지정이 없으므로 성공 시 기본 상태인 `200 OK`를 반환한다. 오류 응답을 위한 별도 예외 처리·응답 DTO는 현재 코드에 정의되어 있지 않다.
+회원 이름이나 이메일이 이미 존재하면 [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java)가 회원별 예외를 던진다. [GlobalExceptionHandler](src/main/java/jpabook/jpashop/common/exception/GlobalExceptionHandler.java)는 해당 예외의 오류 코드를 사용해 `409 Conflict`와 `ApiResponse.fail(...)`을 반환한다. 예를 들어 회원 이름이 중복되면 다음 형태다.
 
-다음 요청으로 정상 응답을 확인할 수 있다.
+```json
+{
+  "success": false,
+  "message": "중복된 아이디의 회원이 존재합니다."
+}
+```
+
+`IllegalArgumentException`은 `400 Bad Request`로 처리한다. 그 밖의 예외는 현재 공통 핸들러가 `500 Internal Server Error`로 처리하며, 요청 DTO 검증 실패를 따로 처리하는 핸들러는 없다.
+
+다음은 요청 형식의 예시다. 현재 버전의 HTTP 응답을 실제 `curl`로 검증한 기록은 없다.
 
 ```bash
 curl -i -X POST http://localhost:8080/member/signup \
   -H 'Content-Type: application/json' \
-  -d '{"username":"memberA","city":"Seoul","street":"Wangsimli","zipcode":"12345"}'
+  -d '{"username":"memberA","password":"example-password","email":"memberA@example.com","city":"Seoul","street":"Wangsimli","zipcode":"12345"}'
 ```
-
-위 예시 요청은 별도 포트와 인메모리 H2로 실행한 앱에서 `200` 및 위 JSON 구조로 확인했다. 기본 설정의 H2 TCP DB에 대해서는 실행하지 않았다.
 
 ## 2. DDD 4계층에 대응한 코드
 
 | 계층 | 현재 파일 | 이 요청에서 하는 일 |
 | --- | --- | --- |
-| 표현 계층 (Presentation) | [MemberController](src/main/java/jpabook/jpashop/member/presentation/MemberController.java), [요청 DTO](src/main/java/jpabook/jpashop/member/presentation/dto/MemberCreateRequest.java), [응답 DTO](src/main/java/jpabook/jpashop/member/presentation/dto/MemberCreateResponse.java) | HTTP 요청 DTO를 회원 객체로 변환하고, 서비스가 반환한 회원을 응답 DTO로 변환 |
-| 응용 계층 (Application) | [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java) | 회원을 저장하고 저장된 ID로 다시 조회해 반환 |
-| 도메인 계층 (Domain) | [Member](src/main/java/jpabook/jpashop/member/domain/Member.java), [Address](src/main/java/jpabook/jpashop/member/domain/vo/Address.java), [MemberRepository](src/main/java/jpabook/jpashop/member/domain/MemberRepository.java) | 회원과 주소를 표현하고 저장소가 제공해야 할 기능을 선언 |
-| 인프라 계층 (Infrastructure) | [MemberRepositoryImpl](src/main/java/jpabook/jpashop/member/infra/MemberRepositoryImpl.java), [MemberJpaRepository](src/main/java/jpabook/jpashop/member/infra/MemberJpaRepository.java) | 도메인 저장소 인터페이스를 구현하고 Spring Data JPA로 DB에 저장 |
+| 표현 계층 (Presentation) | [MemberController](src/main/java/jpabook/jpashop/member/presentation/MemberController.java), [SignupRequest](src/main/java/jpabook/jpashop/member/presentation/dto/SignupRequest.java), [SignupResponse](src/main/java/jpabook/jpashop/member/presentation/dto/SignupResponse.java), [MemberAddressResponse](src/main/java/jpabook/jpashop/member/presentation/dto/MemberAddressResponse.java) | HTTP 요청을 응용 계층 명령으로 바꾸고 결과를 HTTP 응답으로 변환 |
+| 응용 계층 (Application) | [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java), [SignupCommand](src/main/java/jpabook/jpashop/member/application/dto/SignupCommand.java), [MemberView](src/main/java/jpabook/jpashop/member/application/dto/MemberView.java) | 중복 확인, 비밀번호 인코딩, 회원 저장을 조정하고 결과 DTO 반환 |
+| 도메인 계층 (Domain) | [Member](src/main/java/jpabook/jpashop/member/domain/Member.java), [Address](src/main/java/jpabook/jpashop/member/domain/vo/Address.java), [MemberRepository](src/main/java/jpabook/jpashop/member/domain/MemberRepository.java), [회원 예외](src/main/java/jpabook/jpashop/member/domain/exception) | 회원·주소와 저장소 계약, 회원 오류 코드 표현 |
+| 인프라 계층 (Infrastructure) | [MemberRepositoryImpl](src/main/java/jpabook/jpashop/member/infra/MemberRepositoryImpl.java), [MemberJpaRepository](src/main/java/jpabook/jpashop/member/infra/MemberJpaRepository.java) | 도메인 저장소 계약을 Spring Data JPA로 구현 |
 
 ```mermaid
 flowchart LR
-    Client[HTTP 클라이언트] --> Controller[표현: MemberController]
-    Controller --> Domain[도메인: Member · Address]
-    Domain --> Service[응용: MemberService]
-    Service --> Port[도메인: MemberRepository 인터페이스]
-    Port -. 구현 .-> Adapter[인프라: MemberRepositoryImpl]
-    Adapter --> Jpa[인프라: MemberJpaRepository]
+    Client[HTTP 클라이언트] --> Controller[MemberController]
+    Controller --> Command[SignupCommand]
+    Command --> Service[MemberService]
+    Service --> Domain[Member · Address]
+    Service --> Port[MemberRepository]
+    Port -. 구현 .-> Adapter[MemberRepositoryImpl]
+    Adapter --> Jpa[MemberJpaRepository]
     Jpa --> DB[(H2 DB)]
-    Service --> Controller
-    Controller --> Response[표현 DTO: MemberCreateResponse]
+    Service --> View[MemberView]
+    View --> Controller
+    Controller --> Response[SignupResponse · ApiResponse]
     Response --> Client
 ```
 
 ## 3. 실제 내부 처리 순서
 
-1. [MemberController.signup()](src/main/java/jpabook/jpashop/member/presentation/MemberController.java)은 `/member`와 `/signup` 경로를 합쳐 `POST /member/signup`을 처리한다. `@RequestBody`가 JSON을 `MemberCreateRequest`로 받는다.
-2. 컨트롤러는 요청 DTO의 `to()`를 호출한다. 이 메서드가 `Address.of(city, street, zipcode)`와 `Member.create(username, address)`로 도메인 객체를 만든다.
-3. 컨트롤러는 생성한 `Member`를 [MemberService.signup()](src/main/java/jpabook/jpashop/member/application/MemberService.java)에 전달한다.
-4. 서비스는 도메인 인터페이스 `MemberRepository.save(member)`를 호출한다. 실제 빈인 `MemberRepositoryImpl`이 `MemberJpaRepository.save(member)`에 위임한다.
-5. Spring Data JPA가 회원을 저장한다. `Member.id`는 `GenerationType.IDENTITY`로 생성된다. 서비스는 `save()`가 반환한 ID로 `findById()`를 호출해 회원을 다시 조회하고, 조회 결과가 없으면 `IllegalStateException`을 던진다.
-6. 컨트롤러는 반환된 회원을 `MemberCreateResponse.from(saved)`로 응답 DTO에 담고, `@RestController`가 이를 JSON으로 반환한다.
+1. `MemberController.signup()`은 JSON을 `SignupRequest`로 받고 `@Valid`를 실행한 뒤 `toCommand()`로 `SignupCommand`를 만든다.
+2. `MemberService.signup()`은 `MemberRepository.existsByUsername()`과 `existsByEmail()`로 중복을 확인한다. 중복이면 각각 `DuplicatedUsername` 또는 `DuplicatedEmail`을 던진다.
+3. 서비스는 `PasswordEncoder.encode()`로 비밀번호를 인코딩한다. `SignupCommand.toEntity(passwordHash)`가 `Address`와 `Member`를 만든다.
+4. 서비스는 `MemberRepository.register(member)`를 호출한다. `MemberRepositoryImpl`은 `MemberJpaRepository.save(member)`에 위임한다.
+5. 서비스는 저장된 `Member`를 `MemberView`로 변환해 반환한다. 이 메서드에는 `@Transactional`이 선언되어 있으며 저장 후 `findById()`로 다시 조회하지 않는다.
+6. 컨트롤러는 `MemberView`를 `SignupResponse`로 변환하고 `ApiResponse.ok(signupResponse)`를 `201 Created`로 반환한다.
 
-현재 [MemberService](src/main/java/jpabook/jpashop/member/application/MemberService.java)에는 `@Transactional`이 없다. 이 API의 저장과 재조회는 각각 Spring Data JPA의 `save()`와 `findById()`가 제공하는 트랜잭션에서 실행된다. 두 작업을 하나의 트랜잭션으로 묶어야 한다면 응용 계층 메서드에 트랜잭션 경계를 둘 수 있다.
+## 4. 검증 범위와 실행 환경
 
-## 4. 과제에서 구분할 구현 범위
+HTTP 요청·응답 직렬화는 현재 자동 테스트로 검증되지 않았다.
 
-- 응용 계층의 `MemberService`는 표현 계층 DTO를 import하지 않는다. 컨트롤러가 요청 DTO를 도메인 객체로 변환하고 서비스 결과를 응답 DTO로 변환한다.
-- 요청 DTO의 `to()` 메서드는 현재 회원 가입 흐름에서 호출된다. 서비스는 저장 후 `findById()`를 한 번 더 호출한다. JPA 영속성 컨텍스트에 회원이 남아 있다면 이 호출이 별도의 `SELECT` SQL을 실행하지 않을 수도 있다.
-- 회원 이름 중복 확인, 명시적인 입력 검증, 가입 실패 시 통일된 오류 응답은 현재 구현에 없다. 이 문서는 해당 기능이 있다고 가정하지 않는다.
-- 기본 [DB 설정](src/main/resources/application.yml)은 로컬 H2 TCP 연결과 `ddl-auto: create`를 사용한다. 앱을 시작하면 연결된 DB 스키마에 영향을 줄 수 있으므로 과제 실행 환경의 DB 설정을 먼저 확인해야 한다.
+기본 [DB 설정](src/main/resources/application.yml)은 로컬 H2 TCP 연결과 `ddl-auto: create`를 사용한다. 기본 설정으로 앱을 시작하면 연결된 DB 스키마에 영향을 줄 수 있으므로 실행 환경의 DB 설정을 먼저 확인해야 한다.

@@ -18,7 +18,7 @@ public class MemberRepositoryImpl implements MemberRepository { // MemberReposit
 	private final MemberJpaRepository memberJpaRepository; // MemberJpaRepository로 구현: 나중에 갈아낄 수 있음.
 
 	@Override
-	public Member save(Member member) {
+	public Member register(Member member) {
 		return this.memberJpaRepository.save(member);
 	}
 
@@ -35,6 +35,31 @@ public class MemberRepositoryImpl implements MemberRepository { // MemberReposit
 
 		this.memberJpaRepository.deleteById(id);
 		log.info("%s was deleted".formatted(foundMember.getUsername()));
+	}
+
+	@Override
+	public Optional<Member> findByUsername(String username) {
+		return this.memberJpaRepository.findByUsername(username);
+	}
+
+	@Override
+	public Optional<Member> findByEmail(String email) {
+		return this.memberJpaRepository.findByEmail(email);
+	}
+
+	@Override
+	public boolean existsByUsername(String username) {
+		return this.memberJpaRepository.existsByUsername(username);
+	}
+
+	@Override
+	public boolean existsByEmail(String email) {
+		return this.memberJpaRepository.existsByEmail(email);
+	}
+
+	@Override
+	public void deleteAll() {
+		this.memberJpaRepository.deleteAll();
 	}
 
 }

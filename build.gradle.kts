@@ -23,6 +23,8 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 //	DB
 	implementation("org.springframework.boot:spring-boot-h2console:4.1.3")
+	implementation("org.springframework.security:spring-security-web:7.1.2")
+	implementation("org.springframework.boot:spring-boot-validation:4.1.3")
 
 	compileOnly("org.projectlombok:lombok")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
