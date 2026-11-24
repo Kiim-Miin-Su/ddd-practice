@@ -20,8 +20,14 @@ public class Member {
 	@Column(name = "member_id")
 	private Long id;
 
-	@Column(nullable = false)
+	@Column(nullable = false, unique = true)
 	private String username;
+
+	@Column(nullable = false)
+	private String password;
+
+	@Column(nullable = false)
+	private String email;
 
 	@Embedded
 	@Column(nullable = false)
@@ -30,9 +36,11 @@ public class Member {
 	@OneToMany(mappedBy = "member")
 	private List<Order> orders = new ArrayList<>();
 
-	public static Member create(String username, Address address) {
+	public static Member create(String username, String encodedPassword, String email, Address address) {
 		Member member = new Member();
 		member.username = username;
+		member.password = encodedPassword;
+		member.email = email;
 		member.address = address;
 
 		return member;
